@@ -4,18 +4,15 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-# Import custom modules
+
+
 from src.core.lecture_processor import LectureProcessor
 from src.models.lecture_models import DocNotes
+from config import Settings
 
-# Simple settings class since you might not have config.py yet
-class Settings:
-    def __init__(self):
-        self.model = "gpt-4.1-nano"  # Updated to match your model
-        self.whisper_model = "base"
-        self.log_level = "INFO"
 
 settings = Settings()
+
 
 def setup_logging():
     #Configure logging for the application
@@ -61,7 +58,7 @@ def display_notes(notes: DocNotes):
     print("\n" + "="*60)
 
 def process_single_file(file_path: str, logger) -> bool:
-    #Process a single audio file#
+    #Process a single audio file
     try:
         # Initialize the processor
         processor = LectureProcessor()

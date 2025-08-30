@@ -10,6 +10,8 @@ from pathlib import Path
 
 from src.prompts.prompts import messages
 from src.models.lecture_models import SubTopic, Assignment, DocNotes
+from src.integrations.google_docs import GoogleDocsClient
+from src.integrations.google_sheets import GoogleSheetsClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,7 +56,7 @@ class LectureProcessor:
     def extract_structured_notes(self, transcription_text: str) -> Optional[DocNotes]:
         system_msg = messages[0]['content'] if messages and 'content' in messages[0] else \
                 "You are a careful note-taking assistant."
-        input = [
+        prompt_messages = [
                 {'role': 'system', 'content': system_msg},
                 {'role': 'user',
                  'content': f"Please analyze this lecture transcription and extract structured notes:\n\n{transcription_text}"}
@@ -63,7 +65,7 @@ class LectureProcessor:
         logger.info("Extracting structured notes from transcription...")
 
         response = self.client.responses.parse(
-                input=input,
+                input=prompt_messages,
                 model=self.model_name,
                 text_format=DocNotes,
             )
@@ -87,23 +89,14 @@ class LectureProcessor:
             return None
 
     def process_lecture(self, recording_path: str) -> Optional[DocNotes]:
-        """
-        Complete pipeline: transcribe audio and extract structured notes
-        
-        Args:
-            recording_path: Path to the audio file
-            
-        Returns:
-            DocNotes object or None if failed
-        """
         try:
-            # Step 1: Transcribe audio
+            # Transcribe audio
             logger.info(f"Starting processing of: {recording_path}")
             transcription_path = self.transcribe(recording_path)
             if not transcription_path:
                 return None
             
-            # Step 2: Load transcription text
+            # Load transcription text
             try:
                 with open(transcription_path, 'r', encoding='utf-8') as f:
                     transcription_data = json.load(f)
@@ -113,17 +106,26 @@ class LectureProcessor:
                 logger.error(f"Error loading transcription: {e}")
                 return None
             
-            # Step 3: Extract structured notes
+            # Extract structured notes
             notes = self.extract_structured_notes(transcription_text)
             if not notes:
                 return None
             
-            # Step 4: Save notes
+            # Save notes
             recording_name = Path(recording_path).stem
             saved_path = self.save_notes(notes, recording_name)
             if saved_path:
                 logger.info(f"Processing complete! Notes saved to: {saved_path}")
-            
+            doc_client = GoogleDocsClient()
+            sheet_client = GoogleSheetsClient()
+            doc_id = doc_client.create_doc(f"{notes.main_topic} - Lecture Notes")
+            doc_client.write_text( doc_id, transcription_text)
+            sheet_id = sheet_client.get_or_create_spreadsheet("Assignments_Tracker")["id"]
+            sheet_client.write_data(
+                sheet_id,
+                "Sheet1!A:C",
+                [[assignment.title, assignment.description or "", assignment.due_date] for assignment in notes.assignments]
+            )
             return notes
             
         except Exception as e:

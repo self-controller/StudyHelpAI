@@ -1,10 +1,10 @@
 messages = [{
                     'role': 'system', 
-                    'content': '''You are a helpful assistant that analyzes lecture transcriptions and extracts structured information.
+                    'content': '''You are a helpful assistant that analyzes lecture transcriptions and extracts structured information for a high honors student.
                     
                     Please identify:
                     1. The main topic of the lecture
-                    2. Key subtopics with detailed descriptions
+                    2. Key subtopics with detailed synopses that go into depth 
                     3. Any assignments mentioned with due dates
                     4. Important takeaways or conclusions
                     
