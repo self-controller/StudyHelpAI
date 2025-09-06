@@ -54,6 +54,7 @@ class LectureProcessor:
 
     #Extracts structured notes from transcription text using OpenAI API
     def extract_structured_notes(self, transcription_text: str) -> Optional[DocNotes]:
+        
         system_msg = messages[0]['content'] if messages and 'content' in messages[0] else \
                 "You are a careful note-taking assistant."
         prompt_messages = [
@@ -118,14 +119,45 @@ class LectureProcessor:
                 logger.info(f"Processing complete! Notes saved to: {saved_path}")
             doc_client = GoogleDocsClient()
             sheet_client = GoogleSheetsClient()
+
+            logger.info(f"Creating doc with title {notes.main_topic} - Lecture Notes")
             doc_id = doc_client.create_doc(f"{notes.main_topic} - Lecture Notes")
-            doc_client.write_text( doc_id, transcription_text)
-            sheet_id = sheet_client.get_or_create_spreadsheet("Assignments_Tracker")["id"]
-            sheet_client.write_data(
-                sheet_id,
-                "Sheet1!A:C",
-                [[assignment.title, assignment.description or "", assignment.due_date] for assignment in notes.assignments]
-            )
+            logger.info(f"Doc created with ID: {doc_id}")
+
+            logger.info("Writing notes to Google Doc...")
+            notes_text = f"\nMain Topic: {notes.main_topic}"
+            if notes.sub_topics:
+                notes_text += f"\n📋 Subtopics ({len(notes.sub_topics)}):"
+                for i, subtopic in enumerate(notes.sub_topics, 1):
+                    notes_text += f"\n  {i}. {subtopic.title}"
+                    notes_text += f"     {subtopic.description}"
+                    if subtopic.examples:
+                        notes_text += f"     Examples: {', '.join(subtopic.examples)}"
+            
+            if notes.assignments:
+                notes_text += f"\nAssignments ({len(notes.assignments)}):"
+                for assignment in notes.assignments:
+                    notes_text += f"  • {assignment.title}"
+                    notes_text += f"    Due: {assignment.due_date}"
+                    if assignment.description:
+                        notes_text += f"    📄 Details: {assignment.description}"
+            
+            if notes.key_takeaways:
+                notes_text += f"\nKey Takeaways:"
+                for takeaway in notes.key_takeaways:
+                    notes_text += f"  • {takeaway}"
+            
+
+            doc_client.write_text(doc_id, notes_text)
+            logger.info("Notes written to Google Doc successfully.")
+            if notes.assignments:
+                logger.info("Writing assignments to Google Sheet...")
+                sheet_id = sheet_client.create_spreadsheet("Assignments_Tracker")
+                sheet_client.write_data(
+                    sheet_id,
+                    "Sheet1!A:C",
+                    [[assignment.title, assignment.description or "", assignment.due_date] for assignment in notes.assignments]
+                )
             return notes
             
         except Exception as e:

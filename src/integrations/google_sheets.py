@@ -3,14 +3,12 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 
 
 from src.prompts.prompts import messages
 from src.models.lecture_models import SubTopic, Assignment, DocNotes
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
-           "https://www.googleapis.com/auth/drive.metadata.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 CREDS_DIR = Path("data/credentials")
 CREDS_PATH = CREDS_DIR / "credentials.json"
@@ -51,38 +49,3 @@ class GoogleSheetsClient:
         }
         spreadsheet = self.service.spreadsheets().create(body=body).execute()
         return spreadsheet['spreadsheetId']
-    def get_or_create_spreadsheet(self, title: str, sheet_name: str = "Sheet1") -> str:
-        try:
-            drive_service = build('drive', 'v3', credentials=self.creds)
-            response = drive_service.files().list(
-                q=f"name='{title}' and mimeType='application/vnd.google-apps.spreadsheet'",
-                spaces='drive',
-                fields="files(id, name)"
-            ).execute()
-            files = response.get('files', [])
-            files = response.get('files', [])
-            if files:
-                spreadsheet_id = files[0]['id']
-                return {
-                    "id": spreadsheet_id,
-                    "url": f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
-                }
-
-            spreadsheet_body = {
-            'properties': {'title': title},
-            'sheets': [{'properties': {'title': sheet_name}}]
-            }
-            spreadsheet = self.service.spreadsheets().create(
-                body=spreadsheet_body,
-                fields='spreadsheetId'
-            ).execute()
-
-            spreadsheet_id = spreadsheet.get('spreadsheetId')
-            return {
-                "id": spreadsheet_id,
-                "url": f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
-            }
-
-        except HttpError as err:
-            print(f"An error occurred: {err}")
-            return None

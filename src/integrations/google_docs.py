@@ -44,7 +44,7 @@ class GoogleDocsClient:
         doc = self.service.documents().create(body=body).execute()
         return doc["documentId"]
 
-    def write_text(service, document_id: str, text: str) -> None:
+    def write_text(self, document_id: str, text: str) -> None:
         requests = [
             {
                 "insertText": {
@@ -53,4 +53,4 @@ class GoogleDocsClient:
                 }
             }
         ]
-        service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
+        self.service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()

@@ -4,4 +4,4 @@ venv/
 
 .env
 *.log
-data/ # Directory for storing data files
+data/
