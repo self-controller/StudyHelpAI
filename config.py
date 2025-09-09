@@ -3,7 +3,7 @@ from pydantic import Field
 from typing import Optional
 
 class Settings(BaseSettings):
-    model: str = "gpt-4.1-nano"
+    model: str = "gpt-4.1-mini"
     whisper_model: str = "base"
     log_level: str = "INFO"
     openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY")

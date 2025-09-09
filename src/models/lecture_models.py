@@ -21,4 +21,41 @@ class DocNotes(BaseModel):
         description="List of assignments or tasks mentioned in the lecture, if any")
     key_takeaways: Optional[List[str]] = Field(
         None, description="Optional key takeaways or important points from the lecture")
+class EnhancedSubTopic(SubTopic):
+    practice_questions: Optional[List[str]] = Field(
+        None, description="Practice questions related to subtopic for self-assessment if applicable")
+    definitions: Optional[List[str]] = Field(
+        None, description="Key Definitions related to the subtopic if applicable"
+    )
 
+class EnhancedResult(BaseModel):
+    sub_topics: List[EnhancedSubTopic] = Field(..., description="List of structured subtopics with more polished details, more studying focused")
+    key_takeaways: Optional[List[str]] = Field(
+        None, description="Optional key takeaways or important points from the lecture, more studying focused")
+
+class EnhancedDocNotes(BaseModel):
+    main_topic: str = Field(..., description="The overall topic of the entire lecture")
+    assignments: List[Assignment] = Field(
+        default=[],
+        description="List of assignments or tasks mentioned in the lecture, if any"
+    )
+    sub_topics: List[EnhancedSubTopic] = Field(
+        ..., description="List of structured subtopics with more polished details, more studying focused"
+    )
+    key_takeaways: Optional[List[str]] = Field(
+        None, description="Optional key takeaways or important points from the lecture, more studying focused"
+    )
+
+    @classmethod
+    def from_results(
+        cls,
+        main_topic: str,
+        assignments: List[Assignment],
+        enhanced_result: EnhancedResult,
+    ) -> "EnhancedDocNotes":
+        return cls(
+            main_topic=main_topic,
+            assignments=assignments,
+            sub_topics=enhanced_result.sub_topics,
+            key_takeaways=enhanced_result.key_takeaways,
+        )

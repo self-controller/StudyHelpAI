@@ -12,12 +12,13 @@ from src.prompts.prompts import messages
 from src.models.lecture_models import SubTopic, Assignment, DocNotes
 from src.integrations.google_docs import GoogleDocsClient
 from src.integrations.google_sheets import GoogleSheetsClient
+from src.core.note_processor import NoteProcessor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class LectureProcessor:
-    def __init__(self, model_name: str = "gpt-4.1-nano", whisper_model: str = "base"):
+    def __init__(self, model_name: str = "gpt-4.1-mini", whisper_model: str = "base"):
         load_dotenv()
         self.transcriber = whisper.load_model(whisper_model)
         self.base_dir = Path(__file__).resolve().parents[2]
@@ -41,7 +42,7 @@ class LectureProcessor:
             if trans_path.exists():
                 return str(trans_path)
             
-            result = self.transcriber.transcribe(recording_path, language='en', verbose=True)
+            result = self.transcriber.transcribe(recording_path, language='en', verbose=None)
 
             # Save transcription to JSON file
             with open(trans_path, 'w', encoding='utf-8') as f:
@@ -76,7 +77,7 @@ class LectureProcessor:
         return notes
     
     def save_notes(self, notes: DocNotes, filename: str) -> str:
-        """Save structured notes to JSON file"""
+        #Save structured notes to JSON file
         try:
             notes_file = self.notes_dir / f"{filename}_notes.json"
             
@@ -111,54 +112,62 @@ class LectureProcessor:
             notes = self.extract_structured_notes(transcription_text)
             if not notes:
                 return None
-            
+            # Second pass for enhanced notes
+            note_processor = NoteProcessor()
+            final_notes = note_processor.process_notes(notes)
+
             # Save notes
             recording_name = Path(recording_path).stem
-            saved_path = self.save_notes(notes, recording_name)
-            if saved_path:
-                logger.info(f"Processing complete! Notes saved to: {saved_path}")
+            saved_notes_path = self.save_notes(notes, recording_name)
+            saved_final_notes_path = note_processor.save_notes(final_notes, recording_name) if final_notes else None
+            if saved_notes_path:
+                logger.info(f"Processing complete! First pass notes saved to: {saved_notes_path}")
+            if saved_final_notes_path:
+                logger.info(f"Processing complete! First pass notes saved to: {saved_final_notes_path}")    
             doc_client = GoogleDocsClient()
             sheet_client = GoogleSheetsClient()
 
-            logger.info(f"Creating doc with title {notes.main_topic} - Lecture Notes")
-            doc_id = doc_client.create_doc(f"{notes.main_topic} - Lecture Notes")
+            logger.info(f"Creating doc with title {final_notes.main_topic} - Lecture Notes")
+            doc_id = doc_client.create_doc(f"{final_notes.main_topic} - Lecture Notes")
             logger.info(f"Doc created with ID: {doc_id}")
 
             logger.info("Writing notes to Google Doc...")
-            notes_text = f"\nMain Topic: {notes.main_topic}"
-            if notes.sub_topics:
-                notes_text += f"\n📋 Subtopics ({len(notes.sub_topics)}):"
-                for i, subtopic in enumerate(notes.sub_topics, 1):
+            notes_text = f"\nMain Topic: {final_notes.main_topic}"
+            if final_notes.sub_topics:
+                notes_text += f"\n📋 Subtopics ({len(final_notes.sub_topics)}):"
+                for i, subtopic in enumerate(final_notes.sub_topics, 1):
                     notes_text += f"\n  {i}. {subtopic.title}"
                     notes_text += f"     {subtopic.description}"
+                    notes_text += f"     Practice Questions: {', '.join(subtopic.practice_questions)}" if subtopic.practice_questions else ""
+                    notes_text += f"     Definitions: {', '.join(subtopic.definitions)}" if subtopic.definitions else ""
                     if subtopic.examples:
                         notes_text += f"     Examples: {', '.join(subtopic.examples)}"
-            
-            if notes.assignments:
-                notes_text += f"\nAssignments ({len(notes.assignments)}):"
-                for assignment in notes.assignments:
+
+            if final_notes.assignments:
+                notes_text += f"\nAssignments ({len(final_notes.assignments)}):"
+                for assignment in final_notes.assignments:
                     notes_text += f"  • {assignment.title}"
                     notes_text += f"    Due: {assignment.due_date}"
                     if assignment.description:
                         notes_text += f"    📄 Details: {assignment.description}"
             
-            if notes.key_takeaways:
+            if final_notes.key_takeaways:
                 notes_text += f"\nKey Takeaways:"
-                for takeaway in notes.key_takeaways:
+                for takeaway in final_notes.key_takeaways:
                     notes_text += f"  • {takeaway}"
             
 
             doc_client.write_text(doc_id, notes_text)
             logger.info("Notes written to Google Doc successfully.")
-            if notes.assignments:
+            if final_notes.assignments:
                 logger.info("Writing assignments to Google Sheet...")
                 sheet_id = sheet_client.create_spreadsheet("Assignments_Tracker")
                 sheet_client.write_data(
                     sheet_id,
                     "Sheet1!A:C",
-                    [[assignment.title, assignment.description or "", assignment.due_date] for assignment in notes.assignments]
+                    [[assignment.title, assignment.description or "", assignment.due_date] for assignment in final_notes.assignments]
                 )
-            return notes
+            return final_notes
             
         except Exception as e:
             logger.error(f"Error in process_lecture: {e}")
